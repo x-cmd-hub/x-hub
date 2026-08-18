@@ -42,10 +42,11 @@ bootstrap 支持的环境变量：`INSTALL_DIR=./cf-hub-deploy`（安装目录�
 `wrangler login` 需要打开浏览器授权，headless 环境无法使用。改用 **API Token** 认证：
 
 1. 在**有浏览器的机器**上登录 [dash.cloudflare.com](https://dash.cloudflare.com) → 左侧边栏 → **Manage Account（管理帐户）** → **Account API Tokens（帐户 API 令牌）** → **Create Token（创建令牌）**
-2. 选择 **Edit Cloudflare Workers** 模板，在 Additional permissions 里补充：
+2. 选择 **Edit Cloudflare Workers** 模板（已含 Workers Scripts / KV Storage / R2 Storage / Workers Routes 等），再在 Additional permissions 里补两项（模板均不含）：
+   - `Account` → `D1` → **Edit**（建库、建表需要）
    - `Account` → `Cloudflare Pages` → **Edit**（前端部署需要）
-   - `Zone` → `Workers Routes` → **Edit**（仅使用自定义域名时需要）
-3. 创建后复制 Token（只显示一次），在容器 / 虚拟机里：
+3. Account Resources 选要部署的账号；使用自定义域名时，Zone Resources 需包含该域名
+4. 创建后复制 Token（只显示一次），在容器 / 虚拟机里：
 
 ```bash
 export CLOUDFLARE_API_TOKEN=<你的token>
