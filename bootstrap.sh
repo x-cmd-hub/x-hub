@@ -31,10 +31,21 @@ err()  { echo "[bootstrap] 错误：$*" >&2; exit 1; }
 info "=== [1/5] 前置检查 ==="
 command -v curl >/dev/null || err "需要 curl"
 command -v tar  >/dev/null || err "需要 tar"
-command -v node >/dev/null || err "需要 Node.js 18+（后端 wrangler），推荐 24+（前端构建）"
-NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-if [[ "$NODE_MAJOR" -lt 18 ]]; then
-	err "Node.js 版本过低（需要 18+，当前 $(node -v)）"
+# node：缺失或版本过低时通过 x-cmd env use 自动安装（x-cmd 缺失则先装 x-cmd）
+node_usable() {
+	command -v node >/dev/null 2>&1 || return 1
+	[[ "$(node -p 'process.versions.node.split(".")[0]')" -ge 18 ]]
+}
+if ! node_usable; then
+	info "未检测到 Node.js 18+，通过 x-cmd 自动安装 ..."
+	if ! command -v x-cmd >/dev/null 2>&1; then
+		info "  安装 x-cmd ..."
+		eval "$(curl -fsSL https://get.x-cmd.com 2>/dev/null)" >/dev/null 2>&1 || true
+	fi
+	X_PKG_EXEC_BIN="$HOME/.x-cmd.root/local/data/pkg/exec"
+	x-cmd env use node >/dev/null 2>&1 || true
+	[[ -d "$X_PKG_EXEC_BIN" ]] && export PATH="$X_PKG_EXEC_BIN:$PATH"
+	node_usable || err "Node.js 自动安装失败。请手动安装 Node.js 18+ 后重跑（https://nodejs.org）"
 fi
 info "Node.js: $(node -v)"
 
