@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/bootstrap.sh |
 到 [Releases](../../releases) 页面下载 `vX.Y.Z_private.tar.gz`（及 `.sha256` 校验文件），然后：
 
 ```bash
-shasum -a 256 -c vX.Y.Z_private.tar.gz.sha256   # 校验（可选）
+shasum -a 256 -c vX.Y.Z_private.tar.gz.sha256   # 校验（可选；Linux 用 sha256sum -c）
 tar -xzf vX.Y.Z_private.tar.gz
 cd vX.Y.Z_private
 bash deploy.sh
@@ -41,7 +41,7 @@ bootstrap 支持的环境变量：`INSTALL_DIR=./cf-hub-deploy`（安装目录�
 
 `wrangler login` 需要打开浏览器授权，headless 环境无法使用。改用 **API Token** 认证：
 
-1. 在**有浏览器的机器**上登录 [dash.cloudflare.com](https://dash.cloudflare.com) → 右上角头像 → **My Profile** → **API Tokens** → **Create Token**
+1. 在**有浏览器的机器**上登录 [dash.cloudflare.com](https://dash.cloudflare.com) → 左侧边栏 → **Manage Account（管理帐户）** → **Account API Tokens（帐户 API 令牌）** → **Create Token（创建令牌）**
 2. 选择 **Edit Cloudflare Workers** 模板，在 Additional permissions 里补充：
    - `Account` → `Cloudflare Pages` → **Edit**（前端部署需要）
    - `Zone` → `Workers Routes` → **Edit**（仅使用自定义域名时需要）
@@ -54,23 +54,7 @@ bash bootstrap.sh        # 或 bash deploy.sh
 
 Token 泄漏等同于账号权限泄漏，用完可随时在控制台 Roll 或 Delete。
 
-## 三、部署时会问你什么
-
-部署脚本全自动运行（资源创建、部署、密钥、建表都不需要你操作），只有这几个问题需要你回答：
-
-| 问题 | 怎么答 |
-|------|--------|
-| 确认部署到此 Cloudflare 账号？ | 核对显示的账号邮箱，回车确认 |
-| 是否有托管在 Cloudflare 的域名？ | 有则输入根域（如 `example.com`），没有则直接回车 |
-| Pages 项目名 | 回车用默认 `x-hub-web`（撞名会自动换名，无需处理） |
-| 其余 Y/N（是否部署前端 / 初始化模板等） | 按需选择，回车即默认值 |
-
-### 关于域名
-
-- **没有域名**：直接回车。服务跑在 `<worker>.workers.dev`（后端）+ `<项目名>.pages.dev`（前端），只有「子域名分享」不可用，路径分享 `/s/:id` 正常。
-- **有域名**：先把域名托管到 Cloudflare（控制台 Add a Site，按提示改 nameserver），部署时输入根域即可，路由和地址会自动配置。
-
-## 四、部署后验证
+## 三、部署后验证
 
 ```bash
 # 后端健康检查（地址在部署完成时打印）
@@ -80,7 +64,7 @@ curl https://<worker-url>/ping
 # 前端：浏览器打开部署完成时打印的 Pages 地址
 ```
 
-## 五、自定义配置
+## 四、自定义配置
 
 部署前可编辑包内的 `deploy.conf`（改完再跑 `bash deploy.sh` 生效）：
 
@@ -93,7 +77,15 @@ curl https://<worker-url>/ping
 | `R2_BUCKET` | `x-hub-files` | R2 桶名（同名自动复用已有桶） |
 | `D1_NAME` | `x-hub-db` | D1 数据库名（同名自动复用已有库） |
 
-## 六、升级
+### 关于域名（SHARE_DOMAIN）
+
+**为什么要配置域名**：唯一影响的功能是**子域名分享**——配置后每个用户拥有 `用户名.你的域名` 形式的专属分享主页（如 `alice.example.com`）。这需要给 Worker 绑定 `*.域名` 的通配路由，只有托管在 Cloudflare 的自有域名才能做到，`workers.dev` 不支持。此外自有域名地址更干净（`api.域名` / `hub.域名`），且不依赖 `workers.dev` / `pages.dev` 这类公共域名（部分网络环境下访问受限）。
+
+**没有域名会怎么样**：完全可用。后端跑在 `<worker>.workers.dev`，前端跑在 `<项目名>.pages.dev`，同步、文件、路径分享 `/s/:id` 等核心功能全部正常，仅子域名分享不可用。以后买了域名，托管到 Cloudflare 后改 `SHARE_DOMAIN` 重跑 `bash deploy.sh` 即可启用。
+
+**有域名**：先把域名托管到 Cloudflare（控制台 Add a Site，按提示把注册商的 nameserver 改成 CF 分配的地址），再在 `SHARE_DOMAIN` 填根域，部署脚本会自动配置通配路由和子域地址。
+
+## 五、升级
 
 从 [Releases](../../releases) 下载新版 tarball，解压后进入新目录重跑：
 
@@ -105,7 +97,7 @@ bash deploy.sh    # 检测到已部署的 Worker 后选「更新代码」即可�
 
 新目录没有旧配置没关系：脚本会自动找到你账号里的已有部署并复用全部资源。
 
-## 七、常见问题
+## 六、常见问题
 
 **CORS 跨域报错**
 检查部署目录 `wrangler.toml` 的 `ALLOWED_ORIGINS` 是否包含前端域名，缺了就补上后重跑 `bash deploy.sh`。
