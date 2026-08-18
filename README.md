@@ -50,6 +50,23 @@ bash deploy.sh
 
 bootstrap 支持的环境变量：`INSTALL_DIR=./cf-hub-deploy`（安装目录）、`TAG=`（指定版本，默认最新）、`REPO=`（默认本仓库）。
 
+### 在容器 / 虚拟机 / 无浏览器环境部署
+
+`wrangler login` 需要打开浏览器授权，在容器、虚拟机、SSH 远程等 headless 环境无法使用。改用 **API Token** 认证：
+
+1. 在**有浏览器的机器**上登录 [dash.cloudflare.com](https://dash.cloudflare.com) → 右上角头像 → **My Profile** → **API Tokens** → **Create Token**
+2. 选择 **Edit Cloudflare Workers** 模板，在 Additional permissions 里补充：
+   - `Account` → `Cloudflare Pages` → **Edit**（前端部署需要）
+   - `Zone` → `Workers Routes` → **Edit**（仅使用自定义域名时需要）
+3. 创建后复制 Token（只显示一次），在容器 / 虚拟机里：
+
+```bash
+export CLOUDFLARE_API_TOKEN=<你的token>
+bash bootstrap.sh        # 或 bash deploy.sh
+```
+
+脚本会自动识别 API Token，全程无需浏览器。Token 泄漏等同于账号权限泄漏，用完可随时在控制台 Roll 或 Delete。
+
 ## 三、部署过程
 
 `deploy.sh` 会引导你完成全部流程，全程只问少量问题（域名、Pages 项目名、几个 Y/N）：
