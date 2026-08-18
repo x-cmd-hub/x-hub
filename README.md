@@ -18,21 +18,13 @@ x-hub 是 [x-cmd](https://x-cmd.com) 的云同步与分享服务（文件 / 数�
 
 ## 二、快速开始
 
-**方式 A：一行命令（信任来源时）**
+**方式 A：一行命令**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/bootstrap.sh | bash
 ```
 
-**方式 B：先下载审查（推荐）**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/bootstrap.sh -o bootstrap.sh
-less bootstrap.sh
-bash bootstrap.sh
-```
-
-**方式 C：手动下载 Release**
+**方式 B：手动下载 Release**
 
 到 [Releases](../../releases) 页面下载 `vX.Y.Z_private.tar.gz`（及 `.sha256` 校验文件），然后：
 
