@@ -71,11 +71,23 @@ curl -fSL "$DOWNLOAD_URL" -o "$TMPDIR/$TARBALL" || err "下载失败：${DOWNLOA
 info "下载 sha256 校验文件 ..."
 if curl -fSL "$SHA256_URL" -o "$TMPDIR/$TARBALL.sha256" 2>/dev/null; then
 	EXPECTED_SHA="$(awk '{print $1}' "$TMPDIR/$TARBALL.sha256")"
-	ACTUAL_SHA="$(shasum -a 256 "$TMPDIR/$TARBALL" | awk '{print $1}')"
-	if [[ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]]; then
-		err "sha256 校验失败（文件可能被篡改）。期望 ${EXPECTED_SHA}，实际 $ACTUAL_SHA"
+	# sha256sum（Linux）→ shasum（macOS）→ x-cmd hash（内部自动回退 cosmo 工具）
+	if command -v sha256sum >/dev/null 2>&1; then
+		ACTUAL_SHA="$(sha256sum "$TMPDIR/$TARBALL" | awk '{print $1}')"
+	elif command -v shasum >/dev/null 2>&1; then
+		ACTUAL_SHA="$(shasum -a 256 "$TMPDIR/$TARBALL" | awk '{print $1}')"
+	elif command -v x-cmd >/dev/null 2>&1; then
+		ACTUAL_SHA="$(x-cmd hash sha256 "$TMPDIR/$TARBALL")"
+	else
+		ACTUAL_SHA=""
 	fi
-	info "sha256 校验通过：$ACTUAL_SHA"
+	if [[ -z "$ACTUAL_SHA" ]]; then
+		info "⚠ 环境缺少 sha256 工具（sha256sum / shasum / x-cmd），跳过校验"
+	elif [[ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]]; then
+		err "sha256 校验失败（文件可能被篡改）。期望 ${EXPECTED_SHA}，实际 $ACTUAL_SHA"
+	else
+		info "sha256 校验通过：$ACTUAL_SHA"
+	fi
 else
 	info "⚠ 未找到 sha256 文件，跳过校验（建议联系 x-cmd 确认包完整性）"
 fi
