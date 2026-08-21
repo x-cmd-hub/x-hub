@@ -15,7 +15,7 @@ x-hub 是 [x-cmd](https://x-cmd.com) 的云同步与分享服务（文件 / 数�
 
 支持平台：Linux / macOS / **Windows x64**（Windows 需在 [Git Bash](https://git-scm.com) 中运行——安装 x-cmd 即自带；或用 WSL2）。
 
-不需要 Node.js / pnpm / 前端构建工具 / GitHub SSH key：部署由 **x-hub-deployer**（Go 静态二进制，bootstrap 自动下载对应平台版本）完成，依赖缺失时自动补装（node 缺失时经 x-cmd，wrangler 经 npm）。
+不需要 Node.js / pnpm / 前端构建工具 / GitHub SSH key：部署由 **x-hub-deployer**（Go 静态二进制，内嵌在平台包里，bootstrap 自动下载对应平台的那一个包）完成，依赖缺失时自动补装（node 缺失时经 x-cmd，wrangler 经 npm）。
 
 ## 二、快速开始
 
@@ -27,13 +27,12 @@ curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/bootstrap.sh |
 
 **方式 B：手动下载 Release**
 
-到 [Releases](../../releases) 页面下载主包 `vX.Y.Z.tar.gz`（及 `.sha256` 校验文件）和对应平台的 `x-hub-deployer_vX.Y.Z_<os>_<arch>.tar.gz`（Windows 为 `windows_amd64`，内含 `x-hub-deployer.exe`），然后：
+到 [Releases](../../releases) 页面**只下载你这一个平台的包**（`vX.Y.Z_<os>_<arch>.tar.gz`，自包含、无需其他下载；Windows 为 `windows_amd64`），然后：
 
 ```bash
-shasum -a 256 -c vX.Y.Z.tar.gz.sha256          # 校验（可选；Linux 用 sha256sum -c）
-tar -xzf vX.Y.Z.tar.gz && cd vX.Y.Z
-tar -xzf ../x-hub-deployer_vX.Y.Z_<os>_<arch>.tar.gz   # 解压出 ./x-hub-deployer(.exe)
-./x-hub-deployer deploy                          # 或 bash deploy.sh（瘦壳，二进制缺失时自动下载）
+shasum -a 256 -c vX.Y.Z_darwin_arm64.tar.gz.sha256   # 校验（可选；Linux 用 sha256sum -c）
+tar -xzf vX.Y.Z_<os>_<arch>.tar.gz && cd vX.Y.Z_<os>_<arch>
+bash deploy.sh                                        # 或直接 ./x-hub-deployer deploy
 ```
 
 Windows 手动方式（PowerShell，Win10+ 自带 tar）：解压后在包目录运行 `.\x-hub-deployer.exe deploy`；推荐还是用 Git Bash 跑 `bash deploy.sh`，交互体验一致。

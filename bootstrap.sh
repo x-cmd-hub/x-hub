@@ -1,5 +1,5 @@
 #!/bin/bash
-# cf-hub 私有化部署 Bootstrap（install 瘦壳：下载 Go 部署器 + 主包 → exec）
+# cf-hub 私有化部署 Bootstrap（install 瘦壳：下载平台自包含包 → exec 部署器）
 #
 # 一行启动（信任来源时）：
 #   curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/bootstrap.sh | bash
@@ -14,9 +14,9 @@
 #   TAG=                           指定版本（默认查询最新）
 #   REPO=x-cmd-hub/x-hub          GitHub 仓库
 #
-# 流程：探测平台 → 下载 x-hub-deployer（sha256 校验）→ 下载主 tarball + 校验 → 解压 →
-#       审查暂停（仅 tty）→ exec ./x-hub-deployer deploy（无 tty 时 install 层零交互直通 headless）
-# 注意：node/wrangler 等前置检查已移入 deployer 的 [1/8] precheck，此处不再重复。
+# 流程：探测平台 → 下载对应平台自包含包（含 x-hub-deployer 二进制，sha256 校验）
+#       → 解压 → 审查暂停（仅 tty）→ exec ./x-hub-deployer deploy
+#       （无 tty 时 install 层零交互直通 headless；node/wrangler 前置检查在部署器 precheck 内完成）
 set -euo pipefail
 
 REPO="${REPO:-x-cmd-hub/x-hub}"
@@ -36,8 +36,8 @@ if [[ ! -t 0 ]]; then
 	fi
 fi
 
-# ===== [1/5] 前置检查 =====
-info "=== [1/5] 前置检查 ==="
+# ===== [1/4] 前置检查 + 平台探测 =====
+info "=== [1/4] 前置检查 ==="
 command -v curl >/dev/null || err "需要 curl"
 command -v tar  >/dev/null || err "需要 tar"
 
@@ -68,7 +68,7 @@ sha256_of() {
 	fi
 }
 
-# verify_sha <file> <file.sha256 路径或 URL>；缺工具/缺文件时跳过
+# verify_sha <file> <file.sha256 路径>；缺工具/缺文件时跳过
 verify_sha() {
 	local f="$1" sha_src="$2" expected actual
 	if [[ ! -s "$sha_src" ]]; then
@@ -86,8 +86,8 @@ verify_sha() {
 	fi
 }
 
-# ===== [2/5] 选版本 =====
-info "=== [2/5] 选版本 ==="
+# ===== [2/4] 选版本 =====
+info "=== [2/4] 选版本 ==="
 if [[ -n "${TAG:-}" ]]; then
 	info "使用环境变量指定的版本：$TAG"
 else
@@ -107,20 +107,12 @@ info "已选版本：$TAG"
 TMPDIR_B="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_B"' EXIT
 
-# ===== [3/5] 下载 x-hub-deployer（Go 静态部署器）+ 校验 =====
-info "=== [3/5] 下载 x-hub-deployer ==="
-DEPLOYER_ASSET="x-hub-deployer_${TAG}_${PLATFORM}.tar.gz"
-DEPLOYER_URL="https://github.com/${REPO}/releases/download/${TAG}/${DEPLOYER_ASSET}"
-curl -fSL "$DEPLOYER_URL" -o "$TMPDIR_B/$DEPLOYER_ASSET" \
-	|| err "下载失败：$DEPLOYER_URL（确认版本号 $TAG 是否存在）"
-curl -fSL "$DEPLOYER_URL.sha256" -o "$TMPDIR_B/$DEPLOYER_ASSET.sha256" 2>/dev/null || true
-verify_sha "$TMPDIR_B/$DEPLOYER_ASSET" "$TMPDIR_B/$DEPLOYER_ASSET.sha256"
-
-# ===== [4/5] 下载主 tarball + 校验 + 解压 + 审查暂停 =====
-info "=== [4/5] 下载 Release ==="
-TARBALL="${TAG}.tar.gz"
+# ===== [3/4] 下载平台自包含包 + 校验 + 解压 + 审查暂停 =====
+info "=== [3/4] 下载平台包（$PLATFORM，内含部署器）==="
+TARBALL="${TAG}_${PLATFORM}.tar.gz"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${TARBALL}"
-curl -fSL "$DOWNLOAD_URL" -o "$TMPDIR_B/$TARBALL" || err "下载失败：${DOWNLOAD_URL}（确认版本号 $TAG 是否存在）"
+curl -fSL "$DOWNLOAD_URL" -o "$TMPDIR_B/$TARBALL" \
+	|| err "下载失败：$DOWNLOAD_URL（确认版本号 $TAG 与平台 $PLATFORM 是否存在）"
 curl -fSL "$DOWNLOAD_URL.sha256" -o "$TMPDIR_B/$TARBALL.sha256" 2>/dev/null || true
 verify_sha "$TMPDIR_B/$TARBALL" "$TMPDIR_B/$TARBALL.sha256"
 
@@ -133,10 +125,8 @@ if [[ -d "$INSTALL_DIR" ]]; then
 	rm -rf "$INSTALL_DIR"
 fi
 mkdir -p "$INSTALL_DIR"
-# tarball 内顶层目录是 {TAG}/，用 --strip-components=1 去掉
+# tarball 内顶层目录是 {TAG}_{PLATFORM}/，用 --strip-components=1 去掉
 tar -xzf "$TMPDIR_B/$TARBALL" -C "$INSTALL_DIR" --strip-components=1
-# 部署器解压到安装目录（deploy.sh 瘦壳会优先复用 ./x-hub-deployer(.exe)，避免二次下载）
-tar -xzf "$TMPDIR_B/$DEPLOYER_ASSET" -C "$INSTALL_DIR"
 chmod +x "$INSTALL_DIR/x-hub-deployer$EXE"
 info "已解压到 $INSTALL_DIR_ABS"
 
@@ -147,15 +137,15 @@ if [[ "$TTY_OK" == "1" ]]; then
 	ls -la "$INSTALL_DIR"
 	echo "---------------------------"
 	echo
-	echo "📦 版本：$TAG"
+	echo "📦 版本：$TAG（$PLATFORM）"
 	echo "📁 安装目录：$INSTALL_DIR_ABS"
 	echo
 	echo "审查以上信息后按回车继续部署（Ctrl+C 取消）"
 	read -rp ""
 fi
 
-# ===== [5/5] 启动部署 =====
-info "=== [5/5] 启动部署 ==="
+# ===== [4/4] 启动部署 =====
+info "=== [4/4] 启动部署 ==="
 cd "$INSTALL_DIR"
 
 echo
