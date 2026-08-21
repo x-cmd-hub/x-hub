@@ -108,11 +108,11 @@ TMPDIR_B="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR_B"' EXIT
 
 # ===== [3/4] 下载平台自包含包 + 校验 + 解压 + 审查暂停 =====
-info "=== [3/4] 下载平台包（$PLATFORM，内含部署器）==="
+info "=== [3/4] 下载平台包（${PLATFORM}，内含部署器）==="
 TARBALL="${TAG}_${PLATFORM}.tar.gz"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/download/${TAG}/${TARBALL}"
 curl -fSL "$DOWNLOAD_URL" -o "$TMPDIR_B/$TARBALL" \
-	|| err "下载失败：$DOWNLOAD_URL（确认版本号 $TAG 与平台 $PLATFORM 是否存在）"
+	|| err "下载失败：${DOWNLOAD_URL}（确认版本号 $TAG 与平台 $PLATFORM 是否存在）"
 curl -fSL "$DOWNLOAD_URL.sha256" -o "$TMPDIR_B/$TARBALL.sha256" 2>/dev/null || true
 verify_sha "$TMPDIR_B/$TARBALL" "$TMPDIR_B/$TARBALL.sha256"
 
@@ -137,7 +137,7 @@ if [[ "$TTY_OK" == "1" ]]; then
 	ls -la "$INSTALL_DIR"
 	echo "---------------------------"
 	echo
-	echo "📦 版本：$TAG（$PLATFORM）"
+	echo "📦 版本：${TAG}（${PLATFORM}）"
 	echo "📁 安装目录：$INSTALL_DIR_ABS"
 	echo
 	echo "审查以上信息后按回车继续部署（Ctrl+C 取消）"
