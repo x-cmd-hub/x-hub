@@ -1,8 +1,6 @@
 # x-hub 私有化部署
 
-x-hub 是 [x-cmd](https://x-cmd.com) 的云同步与分享服务（文件 / 数据 / AI 技能）。本仓库提供**私有化部署包**：把 x-hub 后端 + 前端一键部署到你自己的 Cloudflare 账号，数据完全在你的 CF 账号内（D1 / R2 / KV）。
-
-> 本仓库只发布部署包（Release tarball）与部署脚本，**不含服务源码**。
+x-hub 是 [x-cmd](https://x-cmd.com) 的云同步与分享服务（文件 / 数据 / AI 技能）。把 x-hub 后端 + 前端一键部署到你自己的 Cloudflare 账号，数据完全在你的 CF 账号内（D1 / R2 / KV）。
 
 ---
 
@@ -11,11 +9,21 @@ x-hub 是 [x-cmd](https://x-cmd.com) 的云同步与分享服务（文件 / 数�
 | 条件 | 说明 |
 |------|------|
 | **Cloudflare 账号** | 免费版即可；资源部署在你自己账号下 |
-| **R2 已激活** | 首次使用请到 [CF 控制台](https://dash.cloudflare.com) → R2 Object Storage 点击激活（免费） |
+| **R2 已激活** | 一次性操作，见下方[图解](#激活-r2首次使用必做)；免费额度 10GB 存储/月，够用 |
 
 支持平台：Linux / macOS / **Windows x64**（Windows 需在 [Git Bash](https://git-scm.com) 中运行——安装 x-cmd 即自带；或用 WSL2）。
 
-不需要 Node.js / pnpm / 前端构建工具 / GitHub SSH key：部署由 **x-hub-deployer**（Go 静态二进制，内嵌在平台包里，bootstrap 自动下载对应平台的那一个包）完成，依赖缺失时自动补装（node 缺失时经 x-cmd，wrangler 经 npm）。
+### 激活 R2（首次使用必做）
+
+部署需要往 R2 对象存储写文件，新账号需先激活它（一次性，之后不用再管）：
+
+1. 登录 [dash.cloudflare.com](https://dash.cloudflare.com)，左侧导航点击 **存储和数据底座 → R2 对象存储**
+2. 若提示需要先**登记付款方式**（绑定信用卡/支付宝即可），先完成绑定——这是 Cloudflare 的实名要求，**免费额度 10GB 存储 + 每月 100 万次 A 类操作，正常使用不产生费用**
+3. 按页面提示确认激活/订阅 R2，看到如下页面即成功（**不用手动创建存储桶**，部署器会自动创建）：
+
+<img src="images/R2.png" alt="激活 R2" width="770">
+
+> 找不到入口？确认登录的是 [dash.cloudflare.com](https://dash.cloudflare.com)（控制台），且左侧导航展开的是「存储和数据底座」分组。
 
 ## 二、快速开始
 
@@ -27,28 +35,52 @@ curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/bootstrap.sh |
 
 **方式 B：手动下载 Release**
 
-到 [Releases](../../releases) 页面**只下载你这一个平台的包**（`vX.Y.Z_<os>_<arch>.tar.gz`，自包含、无需其他下载；Windows 为 `windows_amd64`），然后：
+到 [Releases](../../releases) 页面下载对应平台的包（`vX.Y.Z_<os>_<arch>.tar.gz`；Windows 为 `windows_amd64`），然后：
 
 ```bash
 shasum -a 256 -c vX.Y.Z_darwin_arm64.tar.gz.sha256   # 校验（可选；Linux 用 sha256sum -c）
-tar -xzf vX.Y.Z_<os>_<arch>.tar.gz && cd vX.Y.Z_<os>_<arch>
+tar -xzf vX.Y.Z_<os>_<arch>.tar.gz && cd vX.Y.Z
 bash deploy.sh                                        # 或直接 ./x-hub-deployer deploy
 ```
 
 Windows 手动方式（PowerShell，Win10+ 自带 tar）：解压后在包目录运行 `.\x-hub-deployer.exe deploy`；推荐还是用 Git Bash 跑 `bash deploy.sh`，交互体验一致。
 
-bootstrap 支持的环境变量：`INSTALL_DIR=./cf-hub-deploy`（安装目录）、`TAG=`（指定版本，默认最新）、`REPO=`（默认本仓库）。
+bootstrap 支持的环境变量：`INSTALL_DIR=./cf-hub-deploy`（安装目录）、`TAG=`（指定版本，默认最新）。
 
 ### 在容器 / 虚拟机 / 无浏览器环境部署（headless）
 
-`wrangler login` 需要打开浏览器授权，headless 环境无法使用。改用 **API Token** 认证：
+正常部署时脚本会自动唤起浏览器完成 Cloudflare 授权（`wrangler login`）；但容器 / 虚拟机 / 服务器里没有浏览器，这一步走不通，需要改用 **API Token** 认证。以下 4 步在**任何一台有浏览器的电脑**上操作一次即可：
 
-1. 在**有浏览器的机器**上登录 [dash.cloudflare.com](https://dash.cloudflare.com) → 左侧边栏 → **Manage Account（管理帐户）** → **Account API Tokens（帐户 API 令牌）** → **Create Token（创建令牌）**
-2. 选择 **Edit Cloudflare Workers** 模板（已含 Workers Scripts / KV Storage / R2 Storage / Workers Routes 等），再在 Additional permissions 里补两项（模板均不含）：
-   - `Account` → `D1` → **Edit**（建库、建表需要）
-   - `Account` → `Cloudflare Pages` → **Edit**（前端部署需要）
-3. Account Resources 选要部署的账号；使用自定义域名时，Zone Resources 需包含该域名
-4. 创建后复制 Token（只显示一次），在容器 / 虚拟机里：
+**第 1 步：打开令牌管理页**
+
+登录 [dash.cloudflare.com](https://dash.cloudflare.com) → 左侧导航 **管理帐户 → 帐户 API 令牌** → 点击右上角 **创建令牌**：
+
+<img src="images/API_KEY.png" alt="帐户 API 令牌入口" width="770">
+
+**第 2 步：选择「创建自定义令牌」**
+
+页面顶部是官方模板列表，**往下翻**找到 **创建自定义令牌（Create Custom Token）→ 开始使用**。给令牌起个名字（如 `x-hub-deploy`）。
+
+**第 3 步：添加权限（共 5 条，逐条添加）**
+
+在 Permissions 区块点击下拉框，按下表**逐条**添加（前三段选 `帐户`，最后一条仅使用自定义域名时需要）：
+
+| # | 第一列（作用范围） | 第二列（资源） | 第三列（操作） |
+|---|---|---|---|
+| 1 | 帐户 | Workers Scripts | 编辑 |
+| 2 | 帐户 | Workers KV Storage | 编辑 |
+| 3 | 帐户 | R2 存储（Workers R2 Storage） | 编辑 |
+| 4 | 帐户 | D1 | 编辑 |
+| 5 | 帐户 | Cloudflare Pages | 编辑 |
+| 6（可选） | 区域 | Workers 路由（Workers Routes） | 编辑 |
+
+> 少了任何一条都会导致对应部署步骤报权限错误（比如缺 D1 会建不了数据库）。Token 只部署用、不写代码，**不需要**「Read/Write all resources」这类全量权限。
+
+<img src="images/Permissions.png" alt="添加权限" width="770">
+
+**第 4 步：生成并复制 Token**
+
+过期时间保持默认（或按需收紧）→ 拉到底 **继续以显示摘要 → 创建令牌** → **立即复制 Token（只显示这一次）**。然后在容器 / 虚拟机里：
 
 ```bash
 export CLOUDFLARE_API_TOKEN=<你的token>
@@ -56,9 +88,9 @@ curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/bootstrap.sh |
 # 或已解压好包：./x-hub-deployer --non-interactive --yes deploy
 ```
 
-CI 一行直通（bootstrap 在无终端时零交互、自动选最新版本）。部署器缺答案时一次性聚合列出全部缺失项（flag 名 + 等价环境变量），退出码 2；完整 flag 表见包内 `deploy/docs/README.md`。
+CI 一行直通（bootstrap 在无终端时零交互、自动选最新版本）。
 
-Token 泄漏等同于账号权限泄漏，用完可随时在控制台 Roll 或 Delete。
+Token 泄漏等同于账号权限泄漏，用完可随时回到令牌管理页 Roll（轮换）或 Delete。
 
 ## 三、部署后验证
 
@@ -96,8 +128,8 @@ curl https://<worker-url>/ping
 从 [Releases](../../releases) 下载新版 tarball，解压后进入新目录重跑：
 
 ```bash
-tar -xzf vX.Y.Z_private.tar.gz
-cd vX.Y.Z_private
+tar -xzf vX.Y.Z_<os>_<arch>.tar.gz
+cd vX.Y.Z
 ./x-hub-deployer deploy   # 或 bash deploy.sh；检测到已部署 Worker 后选「更新代码」即可，数据全保留
 ```
 
@@ -113,16 +145,6 @@ cd vX.Y.Z_private
 
 **R2 报 10042 / enable R2**
 你的 CF 账号还没激活 R2：控制台 → R2 Object Storage → 激活后重跑 `./x-hub-deployer deploy`。
-
-**想自己重新构建前端（高级）**
-包内 `website/` 是前端源码，`public/` 是预构建产物。日常部署只用 `public/`，想改前端可以：
-
-```bash
-cd website
-pnpm install
-pnpm build:private   # 需要自行编辑 .env.private
-# 产出 .output/public，替换 public/ 后重跑 ./x-hub-deployer deploy
-```
 
 ---
 
