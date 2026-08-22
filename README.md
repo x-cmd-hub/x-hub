@@ -30,7 +30,7 @@ x-hub 是 [x-cmd](https://x-cmd.com) 的云同步与分享服务（文件 / 数�
 **方式 A：一行命令**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/deploy.sh | bash
 ```
 
 **方式 B：手动下载 Release**
@@ -45,7 +45,7 @@ bash deploy.sh                                        # 或直接 ./x-hub-deploy
 
 Windows 手动方式（PowerShell，Win10+ 自带 tar）：解压后在包目录运行 `.\x-hub-deployer.exe deploy`；推荐还是用 Git Bash 跑 `bash deploy.sh`，交互体验一致。
 
-bootstrap 支持的环境变量：`INSTALL_DIR=./cf-hub-deploy`（安装目录）、`TAG=`（指定版本，默认最新）。
+deploy.sh 支持的环境变量：`INSTALL_DIR=./cf-hub-deploy`（安装目录）、`TAG=`（指定版本，默认最新）。
 
 ### 在容器 / 虚拟机 / 无浏览器环境部署（headless）
 
@@ -84,11 +84,11 @@ bootstrap 支持的环境变量：`INSTALL_DIR=./cf-hub-deploy`（安装目录�
 
 ```bash
 export CLOUDFLARE_API_TOKEN=<你的token>
-curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/deploy.sh | bash
 # 或已解压好包：./x-hub-deployer --non-interactive --yes deploy
 ```
 
-CI 一行直通（bootstrap 在无终端时零交互、自动选最新版本）。
+CI 一行直通（deploy.sh 在无终端时零交互、自动选最新版本）。
 
 Token 泄漏等同于账号权限泄漏，用完可随时回到令牌管理页 Roll（轮换）或 Delete。
 

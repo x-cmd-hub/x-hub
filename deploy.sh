@@ -1,13 +1,13 @@
 #!/bin/bash
-# cf-hub 私有化部署 Bootstrap（install 瘦壳：下载平台自包含包 → exec 部署器）
+# cf-hub 私有化部署入口 deploy.sh（install 瘦壳：下载平台自包含包 → exec 部署器）
 #
 # 一行启动（信任来源时）：
-#   curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/bootstrap.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/deploy.sh | bash
 #
 # 推荐先下载审查（更安全）：
-#   curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/bootstrap.sh -o bootstrap.sh
-#   less bootstrap.sh
-#   bash bootstrap.sh
+#   curl -fsSL https://raw.githubusercontent.com/x-cmd-hub/x-hub/main/deploy.sh -o deploy.sh
+#   less deploy.sh
+#   bash deploy.sh
 #
 # 可用环境变量：
 #   INSTALL_DIR=./cf-hub-deploy   安装目录
@@ -22,8 +22,8 @@ set -euo pipefail
 REPO="${REPO:-x-cmd-hub/x-hub}"
 INSTALL_DIR="${INSTALL_DIR:-./cf-hub-deploy}"
 
-info() { echo "[bootstrap] $*"; }
-err()  { echo "[bootstrap] 错误：$*" >&2; exit 1; }
+info() { echo "[deploy] $*"; }
+err()  { echo "[deploy] 错误：$*" >&2; exit 1; }
 
 # tty 检测：curl|bash 模式下 stdin 是管道，交互改从 /dev/tty 读。
 # 注意不能 exec </dev/tty 替换 fd0 —— bash 还要从管道读脚本剩余部分，
@@ -106,7 +106,7 @@ else
 	LATEST_TAG="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null \
 		| grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"[^"]+"' \
 		| head -1 | sed -E 's/.*"([^"]+)".*/\1/' || true)"
-	[[ -n "$LATEST_TAG" ]] || err "未能查询最新版本（GitHub API 速率限制或网络问题）。请用 TAG=v1.0.0 bash bootstrap.sh 指定版本。"
+	[[ -n "$LATEST_TAG" ]] || err "未能查询最新版本（GitHub API 速率限制或网络问题）。请用 TAG=v1.0.0 bash deploy.sh 指定版本。"
 	if [[ "$TTY_OK" == "1" ]]; then
 		read -rp "选择版本（回车用最新 [$LATEST_TAG]）: " TAG </dev/tty
 		TAG="${TAG:-$LATEST_TAG}"
