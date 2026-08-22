@@ -25,11 +25,13 @@ INSTALL_DIR="${INSTALL_DIR:-./cf-hub-deploy}"
 info() { echo "[bootstrap] $*"; }
 err()  { echo "[bootstrap] 错误：$*" >&2; exit 1; }
 
-# tty 检测：curl|bash 模式下 stdin 是管道，交互 read 前需重定向到 /dev/tty
+# tty 检测：curl|bash 模式下 stdin 是管道，交互改从 /dev/tty 读。
+# 注意不能 exec </dev/tty 替换 fd0 —— bash 还要从管道读脚本剩余部分，
+# 替换后解析器会转而从终端读"脚本"，导致整个脚本静默挂死（零输出卡住）。
 TTY_OK=1
 if [[ ! -t 0 ]]; then
 	if : </dev/tty 2>/dev/null; then
-		exec </dev/tty
+		: # 有终端：各交互点单独 </dev/tty 重定向（见下方 read）
 	else
 		TTY_OK=0
 		info "无终端（管道/CI 环境）：跳过交互，直达 headless 部署（需 CLOUDFLARE_API_TOKEN）"
@@ -41,15 +43,25 @@ info "=== [1/4] 前置检查 ==="
 command -v curl >/dev/null || err "需要 curl"
 command -v tar  >/dev/null || err "需要 tar"
 
-OS="$(uname -s)"
-ARCH="$(uname -m)"
+# 平台探测用 x-cmd os（输出已规范化：darwin/linux/windows + arm64/amd64）。
+# 脚本是非交互 shell，rc 不会自动加载 x-cmd，这里手动加载。
+if ! command -v x-cmd >/dev/null 2>&1; then
+	___X_CMD_CLAUDECODE_READY=1
+	# shellcheck disable=SC1091
+	[ -f "$HOME/.x-cmd.root/X" ] && . "$HOME/.x-cmd.root/X" >/dev/null 2>&1
+fi
+command -v x-cmd >/dev/null 2>&1 \
+	|| err "需要 x-cmd（未检测到）。安装：eval \"\$(curl https://get.x-cmd.com)\"，安装后重开终端重跑"
+
+OS="$(x-cmd os name)"
+ARCH="$(x-cmd os arch)"
+# 兼容 x86_64/x64、aarch64 等同义写法；Windows（含 Git Bash）用原生 exe
 case "$OS/$ARCH" in
-	Linux/x86_64)              PLATFORM="linux_amd64" ;;
-	Linux/aarch64|Linux/arm64) PLATFORM="linux_arm64" ;;
-	Darwin/x86_64)             PLATFORM="darwin_amd64" ;;
-	Darwin/arm64)              PLATFORM="darwin_arm64" ;;
-	# Git Bash / MSYS2 / Cygwin（安装 x-cmd 即自带 Git Bash）：跑原生 Windows 二进制
-	MINGW*/x86_64|MSYS*/x86_64|CYGWIN*/x86_64) PLATFORM="windows_amd64" ;;
+	linux/amd64|linux/x86_64|linux/x64)    PLATFORM="linux_amd64" ;;
+	linux/arm64|linux/aarch64)             PLATFORM="linux_arm64" ;;
+	darwin/amd64|darwin/x86_64|darwin/x64) PLATFORM="darwin_amd64" ;;
+	darwin/arm64|darwin/aarch64)           PLATFORM="darwin_arm64" ;;
+	windows/amd64|windows/x86_64|windows/x64) PLATFORM="windows_amd64" ;;
 	*) err "不支持的平台：$OS/$ARCH" ;;
 esac
 EXE=""
@@ -96,7 +108,7 @@ else
 		| head -1 | sed -E 's/.*"([^"]+)".*/\1/' || true)"
 	[[ -n "$LATEST_TAG" ]] || err "未能查询最新版本（GitHub API 速率限制或网络问题）。请用 TAG=v1.0.0 bash bootstrap.sh 指定版本。"
 	if [[ "$TTY_OK" == "1" ]]; then
-		read -rp "选择版本（回车用最新 [$LATEST_TAG]）: " TAG
+		read -rp "选择版本（回车用最新 [$LATEST_TAG]）: " TAG </dev/tty
 		TAG="${TAG:-$LATEST_TAG}"
 	else
 		TAG="$LATEST_TAG"
@@ -119,7 +131,7 @@ verify_sha "$TMPDIR_B/$TARBALL" "$TMPDIR_B/$TARBALL.sha256"
 INSTALL_DIR_ABS="$(cd "$(dirname "$INSTALL_DIR")" && pwd)/$(basename "$INSTALL_DIR")"
 if [[ -d "$INSTALL_DIR" ]]; then
 	if [[ "$TTY_OK" == "1" ]]; then
-		read -rp "$INSTALL_DIR 已存在，覆盖？[y/N] " YN
+		read -rp "$INSTALL_DIR 已存在，覆盖？[y/N] " YN </dev/tty
 		[[ "$YN" =~ ^[Yy]$ ]] || err "用户取消"
 	fi
 	rm -rf "$INSTALL_DIR"
@@ -141,7 +153,7 @@ if [[ "$TTY_OK" == "1" ]]; then
 	echo "📁 安装目录：$INSTALL_DIR_ABS"
 	echo
 	echo "审查以上信息后按回车继续部署（Ctrl+C 取消）"
-	read -rp ""
+	read -rp "" </dev/tty
 fi
 
 # ===== [4/4] 启动部署 =====
@@ -152,4 +164,7 @@ echo
 echo "========================================"
 echo "  cf-hub 部署（后端 + 前端）"
 echo "========================================"
+if [[ "$TTY_OK" == "1" ]]; then
+	exec "./x-hub-deployer$EXE" deploy </dev/tty
+fi
 exec "./x-hub-deployer$EXE" deploy
